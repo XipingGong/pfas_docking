@@ -133,5 +133,14 @@ grep ZI5 before_set.dat | awk '{print $1, $2, $3, $8, $12, $14, $16, $18, $20, $
 grep ZIS after_set.dat  | awk '{print $1, $2, $3, $8, $12, $14, $16, $18, $20, $22, $24}'
 
 echo ""
+
+# Table S1
+echo ">> Table S1"
+echo "------------"
+# - Before Set
+cat before_set.dat | awk '{print $1, $2, $3, $8, $12, $14, $16, $18, $20, $22, $24}'
+# - After Set
+cat after_set.dat  | awk '{print $1, $2, $3, $8, $12, $14, $16, $18, $20, $22, $24}'
+
 exit
 

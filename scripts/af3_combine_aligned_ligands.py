@@ -10,19 +10,24 @@ def combine_aligned_ligands(root_dir, output_filename):
     - root_dir (str): The root directory containing `aligned_ligand.pdb` files.
     - output_filename (str): The final output file name for the combined ligands.
     """
-    ligand_trajs = []
 
-    # Walk through all directories and find aligned_ligand.pdb files
+    # Collect all aligned_ligand.pdb paths
+    aligned_files = []
     for dirpath, _, filenames in os.walk(root_dir):
-        for filename in filenames:
-            if filename == "aligned_ligand.pdb":  # Find all ligand PDBs
-                ligand_pdb_path = os.path.join(dirpath, filename)
-                try:
-                    traj = md.load(ligand_pdb_path)
-                    ligand_trajs.append(traj)
-                    print(f"📂 Loaded: {ligand_pdb_path}")
-                except Exception as e:
-                    print(f"❌ Error loading {ligand_pdb_path}: {e}")
+        if "aligned_ligand.pdb" in filenames:
+            aligned_files.append(os.path.join(dirpath, "aligned_ligand.pdb"))
+
+    # Sort with "best_pose" first
+    aligned_files.sort(key=lambda x: (0 if "best_pose" in x else 1, x))
+
+    # Load all sorted aligned_ligand.pdb files
+    ligand_trajs = []
+    for path in aligned_files:
+        try:
+            ligand_trajs.append(md.load(path))
+            print(f"📂 Loaded: {path}")
+        except Exception as e:
+            print(f"❌ Error loading {path}: {e}")
 
     if not ligand_trajs:
         print("⚠ No `aligned_ligand.pdb` files found. Exiting.")
