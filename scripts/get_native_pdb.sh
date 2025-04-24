@@ -34,7 +34,6 @@ default_work_dir=$(pwd)
 work_dir=$default_work_dir
 PDBID="7FEU"
 LigandID="4I6"
-output_pdb="${PDBID}_${LigandID}.pdb"
 
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
@@ -50,6 +49,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 PDBID_LigandID="${PDBID}_${LigandID}"
+output_pdb="${PDBID}_${LigandID}.pdb"
 
 # Convert work_dir to full path
 [[ "$work_dir" != /* ]] && work_dir="$default_work_dir/$work_dir"

@@ -23,7 +23,7 @@ def convert_ligand_file(input_file):
                 # Ignore if PDB ID is "not_available"
                 for pdb_id in pdb_ids:
                     if pdb_id.lower() != "not_available":
-                        print(f"{pdb_id} --ligand_id {ligand_id}")
+                        print(f"{pdb_id}_{ligand_id}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert ligand file format and print the results.")
