@@ -14,19 +14,24 @@ It includes the necessary python and bash scripts to run the docking jobs.
 
 + "data" folder
 
-It includes some essential input data files, and the result data files.
+It includes some essential data files used to show the results quickly.
 
 # How to install
 
 You can directly "git clone" this resporsitory, and these scripts can be directly executed by python and bash.
 
-You also need to install other python packages, like the MDTraj, etc. 
+```bash
+
+git clone https://github.com/XipingGong/pfas_docking.git
+
+```
+
+However, you need to change some parameters and install other essential packages, like the MDTraj, etc. 
 
 # Citation
 
-Gong, X. et al. Assessing AlphaFold 3 for Per- and Polyfluoroalkyl Substances (PFAS) Docking in Protein Structures (Submitted)
+Gong, X. et al. Assessing AlphaFold 3 for Per- and Polyfluoroalkyl Substances (PFAS) Docking in Protein Structures, 2025 (Submitted)
 
-Gong, X. et al.  (Submitted)
+Gong, X. et al. AF3-Vina-MMPBSA Method for PFAS Docking in Proteins (Preparation)
 
-# Acknowledgement
 
