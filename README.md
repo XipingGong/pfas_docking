@@ -28,3 +28,5 @@ Gong, X. et al. Assessing AlphaFold 3 for Per- and Polyfluoroalkyl Substances (P
 
 Gong, X. et al.  (Submitted)
 
+# Acknowledgement
+

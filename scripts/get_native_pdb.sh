@@ -17,13 +17,12 @@ python="/home/xg69107/program/anaconda/anaconda3/bin/python" # it requires to in
 # ----
 print_help() {
     echo ""
-    echo "Usage: bash get_native_pdb.sh [--pdbid PDBID] [--ligandid LIGANDID] [--work_dir DIR] [--output_pdb FILE]"
+    echo "Usage: bash get_native_pdb.sh [--pdbid PDBID] [--ligandid LIGANDID] [--work_dir DIR]"
     echo ""
     echo "Optional arguments:"
     echo "  --pdbid         Protein PDB ID (default: 7FEU)"
     echo "  --ligandid      Ligand 3-letter code (default: 4I6)"
     echo "  --work_dir      Working directory name (default: current directory)"
-    echo "  --output_pdb, -o  Output PDB file name (default: <PDBID>_<LigandID>.pdb)"
     echo "  -h, --help      Show this help message and exit"
     echo ""
     exit 0
@@ -41,7 +40,6 @@ while [[ "$#" -gt 0 ]]; do
         --pdbid) PDBID="$2"; shift ;;
         --ligandid) LigandID="$2"; shift ;;
         --work_dir) work_dir="$2"; shift ;;
-        --output_pdb|-o) output_pdb="$2"; shift ;;
         -h|--help) print_help ;;
         *) echo "❌ Unknown parameter: $1"; print_help ;;
     esac
@@ -49,7 +47,6 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 PDBID_LigandID="${PDBID}_${LigandID}"
-output_pdb="${PDBID}_${LigandID}.pdb"
 
 # Convert work_dir to full path
 [[ "$work_dir" != /* ]] && work_dir="$default_work_dir/$work_dir"
@@ -59,6 +56,12 @@ if [ ! -d "$work_dir" ]; then
     echo "❌ Error: work_dir does not exist: $work_dir"
     exit 1
 fi
+
+output_pdb="${PDBID}_${LigandID}.pdb"
+output_pdb_base="${output_pdb##*/}"
+output_pdb_basename="${output_pdb_base%.*}"
+
+
 
 # OPTIONAL (you may modify this section, but do not have to, except you know what you are doing)
 # --------
@@ -112,15 +115,31 @@ echo "$ $python $scripts_dir/extract_pdb.py cleaned_${PDBID_LigandID}_ori.pdb $L
         $python $scripts_dir/extract_pdb.py cleaned_${PDBID_LigandID}_ori.pdb $LigandID # extract the protein and ligand
 echo ""
 
-echo "# Save it as a pdb file: $output_pdb"
-echo "$ mv cleaned_${PDBID_LigandID}_ori_*.pdb $output_pdb"
-        mv cleaned_${PDBID_LigandID}_ori_*.pdb $output_pdb # save it as a pdb file
-echo ""
+echo "# Save it as the pdb file(s)"
+pdb_files=( $(ls cleaned_*_ori_*.pdb 2>/dev/null | sort) )
 
-echo "# Check this pdb file (it must have two chains)"
-echo "$ $python $scripts_dir/check_pdb.py $output_pdb"
-        $python $scripts_dir/check_pdb.py $output_pdb # check this pdb file (it must have two chains)
-echo ""
+n=${#pdb_files[@]}
+if (( n == 0 )); then
+    echo "❌ No cleaned PDB files found."
+    exit 1
+fi
+
+for i in "${!pdb_files[@]}"; do
+    old="${pdb_files[$i]}"
+    if (( n == 1 )); then
+        new="${output_pdb_basename}.pdb"
+    else
+        new="${output_pdb_basename}_$((i + 1)).pdb"
+    fi
+
+    echo "Renaming $old -> $new"
+    mv "$old" "$new"
+    echo ""
+
+    echo "# Check this pdb file (it must have two chains)"
+    $python "$scripts_dir/check_pdb.py" "$new"
+    echo ""
+done
 
 #>> native_model.pdb: <mdtraj.Trajectory with 1 frames, 1072 atoms, 134 residues, and unitcells>
 #>>
@@ -137,8 +156,8 @@ echo ""
 #>>     - Number of atoms: 28
 
 echo "# Remove the temporary files"
-echo "$ rm -f \#* x_* cleaned_*.pdb"
-        rm -f \#* x_* cleaned_*.pdb
+echo "$ rm -f \#* x_* cleaned_*"
+        rm -f \#* x_* cleaned_*
 echo ""
 
 echo "# Go back to the current directory"

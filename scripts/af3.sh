@@ -1,14 +1,14 @@
 #!/bin/bash
 #SBATCH --job-name=af3 #Name your job something original
-##SBATCH --partition=gpu_p #Use the GPU partition
-#SBATCH --partition=gpu_30d_p #Use the 30-day GPU partition
+#SBATCH --partition=gpu_p #Use the GPU partition
+##SBATCH --partition=gpu_30d_p #Use the 30-day GPU partition
 #SBATCH --ntasks=1	
 #SBATCH --cpus-per-task=32 #If you use the default options, AlphaFold3 will run four simutaneous Jackhmmer processes with 8 CPUs each
 #SBATCH --gres=gpu:1 #If you don’t care whether your job uses an A100 node or an H100 node (and there isn’t much difference in run time)…
 #SBATCH --constraint=Milan|SapphireRapids #…this is the easiest way to specify either one without accidentally using a P100 or L4, which lack sufficient device memory
 #SBATCH --mem=60gb
 #SBATCH --output=%x.%j.out     
-#SBATCH --time=8-00:00:00 # 8 days
+#SBATCH --time=0-01:00:00 # request 1-hour to run the AF3 job
 #SBATCH --error=%x.%j.out  # Redirect stderr to the same file as stdout 
 
 START_TIME=$SECONDS
@@ -24,6 +24,7 @@ START_TIME=$SECONDS
 scripts_dir='/home/xg69107/program/pfas_docking/scripts' # need to change 
 
 # This is a folder that has the AF3 parameters file requested from DeepMind
+# The parameters file needs to be requested, and please see the link: https://github.com/google-deepmind/alphafold3
 af3_param_dir='/home/xg69107/program/alphafold3' # need to change
 
 # These should be installed
@@ -43,6 +44,7 @@ print_help() {
     echo "  --work_dir       Working directory (default: current directory)"
     echo "  --native_dir     Folder that contains the reference structures, such as native_model.pdb, native_ligand.pdb, native_ligandH.pdb, and native_ligandH.mol2,"
     echo "                   (default: if unprovided, then the predicted best pose will be a reference for the RMSD calculations)"
+    echo "  --run_af3        Whether to run the AF3 docking command (default: true). Set to false to skip the docking step."
     echo "  -h, --help       Show this help message and exit"
     echo ""
     exit 0
@@ -52,6 +54,7 @@ print_help() {
 default_work_dir=$(pwd)
 work_dir=$default_work_dir
 native_dir="$work_dir/af3/best_pose"
+run_af3=true  # default is true
 
 # This JOSN file has the info of one protein and one ligand, and their residue name must be in the RCSB PDB.
 # This file must be in the working directory.
@@ -64,6 +67,7 @@ while [[ "$#" -gt 0 ]]; do
         --input_json) input_json="$2"; shift ;;
         --work_dir) work_dir="$2"; shift ;;
         --native_dir) native_dir="$2"; shift ;;
+        --run_af3) run_af3="$2"; shift ;;
         -h|--help) print_help ;;
         *) echo "❌ Unknown parameter: $1"; print_help ;;
     esac
@@ -146,20 +150,25 @@ echo "$ cat $input_json_base"
         cat $input_json_base
 echo ""
 
-echo "# Run the AF3 docking (change it if needed)"
-echo "$ singularity exec --nv --bind $work_dir:/root/af_input --bind $work_dir:/root/af_output --bind $af3_param_dir:/root/models --bind /db/AlphaFold3/20241114:/root/public_databases /apps/singularity-images/alphafold-3.0.0-CCDpatched.sif python /app/alphafold/run_alphafold.py --json_path=/root/af_input/$input_json_base --model_dir=/root/models --db_dir=/root/public_databases --output_dir=/root/af_output"
-        singularity exec \
-            --nv \
-            --bind $work_dir:/root/af_input \
-            --bind $work_dir:/root/af_output \
-            --bind $af3_param_dir:/root/models \
-            --bind /db/AlphaFold3/20241114:/root/public_databases \
-            /apps/singularity-images/alphafold-3.0.0-CCDpatched.sif \
-            python /app/alphafold/run_alphafold.py \
-            --json_path=/root/af_input/$input_json_base \
-            --model_dir=/root/models \
-            --db_dir=/root/public_databases \
-            --output_dir=/root/af_output
+# Run the AF3 docking (change it if needed)
+if [[ "$run_af3" == "true" ]]; then
+    echo "# Run the AF3 docking"
+    echo "$ singularity exec --nv --bind $work_dir:/root/af_input --bind $work_dir:/root/af_output --bind $af3_param_dir:/root/models --bind /db/AlphaFold3/20241114:/root/public_databases /apps/singularity-images/alphafold-3.0.0-CCDpatched.sif python /app/alphafold/run_alphafold.py --json_path=/root/af_input/$input_json_base --model_dir=/root/models --db_dir=/root/public_databases --output_dir=/root/af_output"
+    singularity exec \
+        --nv \
+        --bind $work_dir:/root/af_input \
+        --bind $work_dir:/root/af_output \
+        --bind $af3_param_dir:/root/models \
+        --bind /db/AlphaFold3/20241114:/root/public_databases \
+        /apps/singularity-images/alphafold-3.0.0-CCDpatched.sif \
+        python /app/alphafold/run_alphafold.py \
+        --json_path=/root/af_input/$input_json_base \
+        --model_dir=/root/models \
+        --db_dir=/root/public_databases \
+        --output_dir=/root/af_output
+else
+    echo "# ⏩ Skipping AF3 docking step (singularity exec) as --run_af3 is set to false."
+fi
 echo ""
 
 # Analysis
