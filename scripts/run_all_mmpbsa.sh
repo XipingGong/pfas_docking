@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 START_TIME=$SECONDS
 python="/home/xg69107/program/anaconda/anaconda3/bin/python"
 scripts_dir='/home/xg69107/program/pfas_docking/scripts' # need to change 
@@ -14,7 +15,7 @@ process_model() {
 
     echo ">> Processing: $pdb_file"
 
-    # Step 1: Generate input pdb file
+    # Step 1: Generate H-added input pdb file
     bash $scripts_dir/get_ref_for_af3vinammpbsa.sh \
         --input_pdb "$work_pdb" \
         --work_dir mmpbsa \
@@ -31,6 +32,8 @@ process_model() {
         ref_file="mmpbsa/af3-best_pose-aligned_model_convertH_emin.pdb"
     elif [[ $base_name == vina* ]]; then
         ref_file="mmpbsa/vina-vina_model_1_convertH_emin.pdb"
+    elif [[ $base_name == nat* ]]; then
+        ref_file="native/native_modelH.pdb"
     else
         echo "⚠️ Warning: Unknown prefix for $base_name — skipping RMSD"
         return
@@ -49,7 +52,7 @@ process_model() {
 }
 
 echo "🚀 Starting AF3 and Vina models..."
-for pdb_file in {af3/*/aligned_model_convert.pdb,vina/vina_model_*_convert.pdb}; do
+for pdb_file in {native/native_model.pdb,af3/*/aligned_model_convert.pdb,vina/vina_model_*_convert.pdb}; do
     if [[ -f "$pdb_file" ]]; then
         full_path=$(realpath "$pdb_file")
         safe_name=$(echo "$pdb_file" | sed 's|/|-|g')
@@ -60,8 +63,7 @@ for pdb_file in {af3/*/aligned_model_convert.pdb,vina/vina_model_*_convert.pdb};
     fi
 done
 
-
 END_TIME=$SECONDS
 ELAPSED_TIME=$((END_TIME - START_TIME))
-echo "$(date '+%Y-%m-%d %H:%M:%S') Time taken for this script: $ELAPSED_TIME seconds"
+echo "$(date '+%Y-%m-%d %H:%M:%S') Time taken for run_all_mmpbsa.sh script: $ELAPSED_TIME seconds"
 

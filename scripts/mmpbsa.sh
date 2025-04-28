@@ -13,8 +13,8 @@ START_TIME=$SECONDS
 scripts_dir='/home/xg69107/program/pfas_docking/scripts' # need to change 
 
 # These should be installed
-gmx="/home/xg69107/program/anaconda/anaconda3/envs/gmxMMPBSA/bin.AVX2_256/gmx"
 python="/home/xg69107/program/anaconda/anaconda3/bin/python"
+gmx="/home/xg69107/program/anaconda/anaconda3/envs/gmxMMPBSA/bin.AVX2_256/gmx"
 gmx_MMPBSA="/home/xg69107/program/anaconda/anaconda3/envs/gmxMMPBSA/bin/gmx_MMPBSA" # need to run in the gmxMMPBSA environment
 
 # INFO
@@ -28,7 +28,7 @@ print_help() {
     echo ""
     echo "Optional:"
     echo "  --work_dir      Working directory (default: current directory)"
-    echo "  --native_dir    A directory to include the files as the reference (default: native in the current directory"
+    echo "  --native_dir    A directory to include the files as the reference (default: native in the current directory)"
     echo "  -h, --help      Show this help message and exit"
     echo ""
     exit 0

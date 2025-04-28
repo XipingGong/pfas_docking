@@ -100,7 +100,7 @@ echo "$ $python $scripts_dir/check_pdb.py ${PDBID_LigandID}_ori.pdb"
         $python $scripts_dir/check_pdb.py ${PDBID_LigandID}_ori.pdb # check what this PDB file has
 echo ""
 
-# Clean up this PDB file, so that it only has one protein and one PFNA molecule
+# Clean up this PDB file, so that it only has one protein and one ligand molecule
 echo "# Clean up this PDB file: ${PDBID_LigandID}_ori.pdb"
 echo "------------------------"
 echo ""

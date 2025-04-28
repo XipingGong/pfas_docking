@@ -131,8 +131,8 @@ fi
 if [ "$has_native_dir" == "true" ]; then
     echo "# Case 1: Create a hydrogen-added structure"
     # Protein
-    echo "$ grep ' A ' $input_pdb > x_prot.pdb"
-            grep ' A ' $input_pdb > x_prot.pdb # Native protein
+    echo "$ awk 'substr($0, 22, 1) == "A"' $input_pdb > x_prot.pdb"
+            awk 'substr($0, 22, 1) == "A"' $input_pdb > x_prot.pdb # Native protein
     echo ""
 
     echo "$ $gmx pdb2gmx -f x_prot.pdb -o x_protH_gmx.pdb -p x_protH_gmx.top -ff $protein_ff -water tip3p"
@@ -144,8 +144,8 @@ if [ "$has_native_dir" == "true" ]; then
     echo ""
 
     # Ligand
-    echo "$ grep ' B ' $input_pdb > x_lig.pdb"
-            grep ' B ' $input_pdb > x_lig.pdb # Native ligand
+    echo "$ awk 'substr($0, 22, 1) == "B"' $input_pdb > x_lig.pdb"
+            awk 'substr($0, 22, 1) == "B"' $input_pdb > x_lig.pdb # Native ligand
     echo ""
 
     echo "$ $python $scripts_dir/addh.py x_lig.pdb --ref_pdb $native_ligandH_pdb --ref_mol2 $native_ligandH_mol2 -o x_ligH.pdb"
@@ -171,11 +171,11 @@ if [ "$has_native_dir" == "false" ]; then
     echo ""
 
     # Extract the protein and ligand
-    echo "$ grep ' A ' native_model.pdb > native_protein.pdb"
-            grep ' A ' native_model.pdb > native_protein.pdb # Native protein
+    echo "$ awk 'substr($0, 22, 1) == "A"' native_model.pdb > native_protein.pdb"
+            awk 'substr($0, 22, 1) == "A"' native_model.pdb > native_protein.pdb # Native protein
     echo ""
-    echo "$ grep ' B ' native_model.pdb > native_ligand.pdb"
-            grep ' B ' native_model.pdb > native_ligand.pdb # Native ligand
+    echo "$ awk 'substr($0, 22, 1) == "B"' native_model.pdb > native_ligand.pdb"
+            awk 'substr($0, 22, 1) == "B"' native_model.pdb > native_ligand.pdb # Native ligand
     echo ""
 
     # Add hydrogen atoms and save the native protein and ligand structures as a reference

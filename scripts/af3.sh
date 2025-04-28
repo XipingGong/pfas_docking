@@ -177,8 +177,8 @@ echo ""
 echo "# Create a "best_pose" folder & copy the af3_model.cif file into model.cif in this folder"
 echo "$ mkdir -p $af3_dir/best_pose"
         mkdir -p $af3_dir/best_pose
-echo "$ cp $af3_dir/af3_model.cif $af3_dir/best_pose/model.cif"
-        cp $af3_dir/af3_model.cif $af3_dir/best_pose/model.cif
+echo "$ cp $af3_dir/${input_json_basename}_model.cif $af3_dir/best_pose/model.cif"
+        cp $af3_dir/${input_json_basename}_model.cif $af3_dir/best_pose/model.cif
 echo ""
 
 # Convert cif to pdb

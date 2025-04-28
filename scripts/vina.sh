@@ -23,7 +23,7 @@ mk_prepare_receptor="/home/xg69107/program/anaconda/anaconda3/bin/mk_prepare_rec
 print_help() {
     echo ""
     echo "Usage: bash vina.sh --input_pdb FILE [--work_dir DIR] [--native_dir FOLDER]"
-    echo "                    [--receptor FILE] [--ligand FILE] [--pocket_params FILE]"
+    echo "                    [--receptor FILE] [--ligand FILE] [--pocket_params FILE] [--run_vina true]"
     echo ""
     echo "Required:"
     echo "  --input_pdb        PDB file containing protein (chain A) and ligand (chain B), without hydrogens"
@@ -35,6 +35,7 @@ print_help() {
     echo "  --receptor         Pre-generated receptor file (default: vina_receptor.pdb created from input_pdb)"
     echo "  --ligand           Pre-generated ligand file (default: vina_ligand.pdb created from input_pdb)"
     echo "  --pocket_params    Pre-generated vina config file (default: vina_pocket_params.txt created from input_pdb)"
+    echo "  --run_vina         Whether to run the Vina docking command (default: true). Set to false to skip the docking step (good for the second test)."
     echo "  -h, --help         Show this help message and exit"
     echo ""
     exit 0
@@ -43,6 +44,7 @@ print_help() {
 # Default Values
 default_work_dir=$(pwd)
 work_dir=$default_work_dir
+run_vina=true  # default is true
 
 # This pdb file has one protein and one ligand, and their residue name must be in the RCSB PDB.
 # The file name must be in the working directory.
@@ -58,10 +60,11 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         --input_pdb) input_pdb="$2"; shift ;;
         --work_dir) work_dir="$2"; shift ;;
+        --native_dir) native_dir="$2"; shift ;;
         --receptor) receptor_pdb="$2"; shift ;;
         --ligand) ligand_pdb="$2"; shift ;;
         --pocket_params) pocket_params="$2"; shift ;;
-        --native_dir) native_dir="$2"; shift ;;
+        --run_vina) run_vina="$2"; shift ;;
         -h|--help) print_help ;;
         *) echo "❌ Unknown parameter: $1"; print_help ;;
     esac
@@ -119,41 +122,46 @@ else
     echo "✅ All data will be saved into this folder:"
     echo "   → $vina_dir"
 fi
+echo ""
 
-echo "# Create the input files for Vina"
-# Generate input files if not provided
-if [[ -z "$receptor_pdb" || -z "$ligand_pdb" || -z "$pocket_params" ]]; then
-    echo "$ $python $scripts_dir/get_inputs_for_vina.py $input_pdb --protein_output vina_receptor.pdb --ligand_output vina_ligand.pdb --pocket_params_output vina_pocket_params.txt"
-            $python $scripts_dir/get_inputs_for_vina.py $input_pdb --protein_output vina_receptor.pdb --ligand_output vina_ligand.pdb --pocket_params_output vina_pocket_params.txt
-    receptor_pdb="vina_receptor.pdb"
-    ligand_pdb="vina_ligand.pdb"
-    pocket_params="vina_pocket_params.txt"
+if [[ "$run_vina" == "true" ]]; then
+    echo "# Create the input files for Vina"
+    # Generate input files if not provided
+    if [[ ! -f "$receptor_pdb" || ! -f "$ligand_pdb" || ! -f "$pocket_params" ]]; then
+        echo "$ $python $scripts_dir/get_inputs_for_vina.py $input_pdb --protein_output vina_receptor.pdb --ligand_output vina_ligand.pdb --pocket_params_output vina_pocket_params.txt"
+                $python $scripts_dir/get_inputs_for_vina.py $input_pdb --protein_output vina_receptor.pdb --ligand_output vina_ligand.pdb --pocket_params_output vina_pocket_params.txt
+        receptor_pdb="vina_receptor.pdb"
+        ligand_pdb="vina_ligand.pdb"
+        pocket_params="vina_pocket_params.txt"
+    else
+        echo "> Using provided receptor, ligand, and pocket_params files:"
+        echo "  - receptor: $receptor_pdb"
+        echo "  - ligand: $ligand_pdb"
+        echo "  - pocket_params: $pocket_params"
+    fi
+    echo ""
+    
+    echo "$ $mk_prepare_receptor -i $receptor_pdb -o vina_receptor -p -a"
+            $mk_prepare_receptor -i $receptor_pdb -o vina_receptor -p -a
+    echo ""
+    echo "$ $obabel $ligand_pdb -O vina_ligand.sdf -p 7.4"
+            $obabel $ligand_pdb -O vina_ligand.sdf -p 7.4
+    echo ""
+    echo "$ $mk_prepare_ligand -i vina_ligand.sdf -o vina_ligand.pdbqt"
+            $mk_prepare_ligand -i vina_ligand.sdf -o vina_ligand.pdbqt
+    echo ""
+    
+    echo "# Run the Vina (change it if needed)"
+    echo "$ $vina --receptor vina_receptor.pdbqt --ligand vina_ligand.pdbqt --config vina_pocket_params.txt --out vina_ligand_docked.pdbqt --exhaustiveness 32 --num_modes 5"
+            $vina --receptor vina_receptor.pdbqt \
+                  --ligand vina_ligand.pdbqt \
+                  --config $pocket_params \
+                  --out vina_ligand_docked.pdbqt \
+                  --exhaustiveness 32 \
+                  --num_modes 5
 else
-    echo "> Using provided receptor, ligand, and pocket_params files:"
-    echo "  - receptor: $receptor_pdb"
-    echo "  - ligand: $ligand_pdb"
-    echo "  - pocket_params: $pocket_params"
+    echo "# ⏩ Skipping Vina docking step (singularity exec) as --run_vina is set to false."
 fi
-echo ""
-
-echo "$ $mk_prepare_receptor -i $receptor_pdb -o vina_receptor -p -a"
-        $mk_prepare_receptor -i $receptor_pdb -o vina_receptor -p -a
-echo ""
-echo "$ $obabel $ligand_pdb -O vina_ligand.sdf -p 7.4"
-        $obabel $ligand_pdb -O vina_ligand.sdf -p 7.4
-echo ""
-echo "$ $mk_prepare_ligand -i vina_ligand.sdf -o vina_ligand.pdbqt"
-        $mk_prepare_ligand -i vina_ligand.sdf -o vina_ligand.pdbqt
-echo ""
-
-echo "# Run the Vina (change it if needed)"
-echo "$ $vina --receptor vina_receptor.pdbqt --ligand vina_ligand.pdbqt --config vina_pocket_params.txt --out vina_ligand_docked.pdbqt --exhaustiveness 32 --num_modes 5"
-        $vina --receptor vina_receptor.pdbqt \
-              --ligand vina_ligand.pdbqt \
-              --config $pocket_params \
-              --out vina_ligand_docked.pdbqt \
-              --exhaustiveness 32 \
-              --num_modes 5
 echo ""
 
 # Analysis
@@ -230,7 +238,7 @@ if [[ -f "$native_model_pdb" && -f "$native_ligand_pdb" && -f "$native_ligandH_p
 
 else # using the default $input_pdb
 
-    native_model_pdb="$work_dir/$input_pdb_base"
+    native_model_pdb="$input_pdb"
     native_ligand_pdb="$vina_dir/vina_ligand.pdb"
     echo "# ✅ Using the input_pdb as the reference model structure. Proceeding with ligand alignment..."
     echo "   - $native_model_pdb"
@@ -238,8 +246,8 @@ else # using the default $input_pdb
     echo "# Convert each docked ligand pdb file and make sure it is the same as native_ligand.pdb except the coordinates"
     for i in $(seq 1 $(grep -c ^MODEL vina_ligands.pdb)); do
 
-        echo "$ $python $scripts_dir/reorder_pdb_by_coord_mapping.py vina_ligand_ref.pdb x_ligand.pdb vina_ligand_${i}.pdb > x_vina_ligand_${i}.pdb"
-                $python $scripts_dir/reorder_pdb_by_coord_mapping.py vina_ligand_ref.pdb x_ligand.pdb vina_ligand_${i}.pdb > x_vina_ligand_${i}.pdb
+        echo "$ $python $scripts_dir/reorder_pdb_by_coord_mapping.py vina_ligand_ref.pdb vina_ligand.pdb vina_ligand_${i}.pdb > x_vina_ligand_${i}.pdb"
+                $python $scripts_dir/reorder_pdb_by_coord_mapping.py vina_ligand_ref.pdb vina_ligand.pdb vina_ligand_${i}.pdb > x_vina_ligand_${i}.pdb
         echo ""
         echo "$ $python $scripts_dir/update_pdb_coord.py x_vina_ligand_${i}.pdb --ref $native_ligand_pdb -o vina_ligand_${i}_convert.pdb"
                 $python $scripts_dir/update_pdb_coord.py x_vina_ligand_${i}.pdb --ref $native_ligand_pdb -o vina_ligand_${i}_convert.pdb

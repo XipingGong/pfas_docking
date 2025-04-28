@@ -98,7 +98,7 @@ def main():
     target_pocket_atoms = get_matched_pocket_atoms(ref_traj, target_traj, ref_pocket_atoms)
     if len(ref_pocket_atoms) == len(target_pocket_atoms):
         print("📐 Aligning target to reference using protein backbone pocket atoms...")
-        target_traj.superpose(ref_traj, atom_indices=ref_pocket_atoms)
+        target_traj.superpose(ref_traj, atom_indices=target_pocket_atoms, ref_atom_indices=ref_pocket_atoms)
 
         # Compute RMSD of protein
         idx = target_traj.topology.select(f"protein and backbone and not element H")
@@ -109,7 +109,7 @@ def main():
         print(f"📊 Pocket-Aligned Protein Backbone RMSD (MDTraj): {rmsd_values} nm")
         
         # Compute RMSD of protein pocket
-        target_pocket_traj = target_traj.atom_slice(ref_pocket_atoms)
+        target_pocket_traj = target_traj.atom_slice(target_pocket_atoms)
         ref_pocket_traj = ref_traj.atom_slice(ref_pocket_atoms)
         rmsd_values = md.rmsd(target_pocket_traj, ref_pocket_traj)
         print(f"📊 Pocket-Aligned Protein Backbone Pocket RMSD (MDTraj): {rmsd_values} nm")
