@@ -173,6 +173,9 @@ echo "$ $obabel vina_ligand_docked.pdbqt -O vina_ligands.pdb --separate -d"
 echo ""
 echo "$ $obabel vina_ligands.pdb -O vina_ligand_.pdb -m -d"
         $obabel vina_ligands.pdb -O vina_ligand_.pdb -m -d
+tag=$(date +%s)
+obabel vina_ligands.pdb -O x_vina_ligand_${tag}_.pdb -m -d
+num_vina_ligand_pdb=$(ls x_vina_ligand_${tag}_*.pdb 2>/dev/null | wc -l)
 echo ""
 
 echo "# Check their RMSD values: vina_ligands.pdb "
@@ -199,7 +202,7 @@ if [[ -f "$native_model_pdb" && -f "$native_ligand_pdb" && -f "$native_ligandH_p
     echo "   - $native_ligandH_mol2"
     echo ""
 
-    for i in $(seq 1 $(grep -c ^MODEL vina_ligands.pdb)); do
+    for i in $(seq 1 $num_vina_ligand_pdb); do
 
         # Ligand - Convert each docked ligand pdb file: make sure it is the same as native_ligand.pdb except the coordinates
         echo "$ $python $scripts_dir/reorder_pdb_by_coord_mapping.py vina_ligand_ref.pdb vina_ligand.pdb vina_ligand_${i}.pdb > x_vina_ligand_${i}.pdb"
@@ -244,7 +247,7 @@ else # using the default $input_pdb
     echo "   - $native_model_pdb"
 
     echo "# Convert each docked ligand pdb file and make sure it is the same as native_ligand.pdb except the coordinates"
-    for i in $(seq 1 $(grep -c ^MODEL vina_ligands.pdb)); do
+    for i in $(seq 1 $num_vina_ligand_pdb); do
 
         echo "$ $python $scripts_dir/reorder_pdb_by_coord_mapping.py vina_ligand_ref.pdb vina_ligand.pdb vina_ligand_${i}.pdb > x_vina_ligand_${i}.pdb"
                 $python $scripts_dir/reorder_pdb_by_coord_mapping.py vina_ligand_ref.pdb vina_ligand.pdb vina_ligand_${i}.pdb > x_vina_ligand_${i}.pdb

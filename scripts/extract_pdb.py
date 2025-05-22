@@ -49,7 +49,7 @@ def extract_pdb(pdb_file, ligand_id):
         if len(protein_atoms) == 0:
             print(f"No protein atoms found for ligand {lig_res_index}. Skipping...")
             continue
-        
+
         distances = md.compute_distances(traj, np.array([[lig_atoms, prot] for prot in protein_atoms if prot != lig_atoms]))
 
         # Identify the closest protein residue
@@ -59,16 +59,24 @@ def extract_pdb(pdb_file, ligand_id):
         closest_chain_index = closest_residue.chain.index
 
         # Select all atoms in the same chain as the closest residue
-        chain_atoms = topology.select( #f"((protein and chainid {closest_chain_index}) or resid {lig_res_index}) and not H element")
+        chain_atoms = topology.select(
             f"((protein and chainid {closest_chain_index}) or (resid {lig_res_index})) and element != H"
         )
 
         # Extract sub-trajectory for the ligand and protein chain
         sub_traj = traj.atom_slice(chain_atoms)
 
-        # Save extracted structure in the same folder as the input PDB file
+        # Save temporary structure
+        temp_pdb = os.path.join(output_folder, f"temp_{base_name}_{ligand_id}_{lig_res_index}.pdb")
+        sub_traj.save_pdb(temp_pdb)
+
+        # Use PDBFixer to clean residue numbering and avoid MDTraj warnings
+        fixer = PDBFixer(filename=temp_pdb)
         output_pdb = os.path.join(output_folder, f"{base_name}_{ligand_id}_{lig_res_index}_Protein_Chain{closest_chain_id}.pdb")
-        sub_traj.save_pdb(output_pdb)
+        with open(output_pdb, "w") as f:
+            PDBFile.writeFile(fixer.topology, fixer.positions, f)
+
+        os.remove(temp_pdb)  # Clean up temporary file
         print(f"Saved: {output_pdb}, {sub_traj}")
 
 # Example usage

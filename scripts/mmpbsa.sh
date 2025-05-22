@@ -103,25 +103,35 @@ echo ""
 # Vacuum energy minimization
 # --------------------------
 
-echo "$gmx editconf -f $input_pdb -o complex_init_box.pdb -bt cubic -d 2.0 "
-      $gmx editconf -f $input_pdb -o complex_init_box.pdb -bt cubic -d 2.0 
+echo "$gmx editconf -f $input_pdb -o complex_init_box.pdb -bt cubic -d 5.0 "
+      $gmx editconf -f $input_pdb -o complex_init_box.pdb -bt cubic -d 5.0 
 echo ""
 
-echo "$gmx grompp -f $native_dir/em.mdp -c complex_init_box.pdb -r complex_init_box.pdb -p $native_dir/native_modelH.top -o em.tpr -maxwarn 1"
-      $gmx grompp -f $native_dir/em.mdp -c complex_init_box.pdb -r complex_init_box.pdb -p $native_dir/native_modelH.top -o em.tpr -maxwarn 1
+# steep-optimization
+echo "$gmx grompp -f $native_dir/em_steep.mdp -c complex_init_box.pdb -r complex_init_box.pdb -p $native_dir/native_modelH.top -o em_steep.tpr -maxwarn 1"
+      $gmx grompp -f $native_dir/em_steep.mdp -c complex_init_box.pdb -r complex_init_box.pdb -p $native_dir/native_modelH.top -o em_steep.tpr -maxwarn 1
 echo ""
 
-echo "$gmx mdrun -v -deffnm em"
-      $gmx mdrun -v -deffnm em
+echo "$gmx mdrun -v -deffnm em_steep"
+      $gmx mdrun -v -deffnm em_steep
 echo ""
 
-echo "echo -e "0\n0" | $gmx trjconv -f em.gro -s em.tpr -o em_mol.pdb -pbc mol -center -ur compact -dump 0"
-      echo -e "0\n0" | $gmx trjconv -f em.gro -s em.tpr -o em_mol.pdb -pbc mol -center -ur compact -dump 0
+# cg-optimization
+echo "$gmx grompp -f $native_dir/em_cg.mdp -c em_steep.gro -r complex_init_box.pdb -p $native_dir/native_modelH.top -o em_cg.tpr -maxwarn 1"
+      $gmx grompp -f $native_dir/em_cg.mdp -c em_steep.gro -r complex_init_box.pdb -p $native_dir/native_modelH.top -o em_cg.tpr -maxwarn 1
+echo ""
+
+echo "$gmx mdrun -v -deffnm em_cg"
+      $gmx mdrun -v -deffnm em_cg
+echo ""
+
+echo "echo -e "0\n0" | $gmx trjconv -f em_cg.gro -s em_cg.tpr -o em_cg_mol.pdb -pbc mol -center -ur compact -dump 0"
+      echo -e "0\n0" | $gmx trjconv -f em_cg.gro -s em_cg.tpr -o em_cg_mol.pdb -pbc mol -center -ur compact -dump 0
 echo ""
 
 # - Aligned complex_emin.pdb
-echo "$python $scripts_dir/align_pdb.py em_mol.pdb --ref $native_dir/native_modelH.pdb --output aligned_modelH.pdb --oligand aligned_ligandH.pdb"
-      $python $scripts_dir/align_pdb.py em_mol.pdb --ref $native_dir/native_modelH.pdb --output aligned_modelH.pdb --oligand aligned_ligandH.pdb
+echo "$python $scripts_dir/align_pdb.py em_cg_mol.pdb --ref $native_dir/native_modelH.pdb --output aligned_modelH.pdb --oligand aligned_ligandH.pdb"
+      $python $scripts_dir/align_pdb.py em_cg_mol.pdb --ref $native_dir/native_modelH.pdb --output aligned_modelH.pdb --oligand aligned_ligandH.pdb
 echo ""
 
 echo "$python $scripts_dir/update_pdb_coord.py aligned_modelH.pdb --ref $native_dir/native_modelH.pdb -o ${input_pdb_basename}_emin.pdb"
@@ -130,11 +140,11 @@ echo ""
 
 # MM/PBSA
 echo "# Run the MM/PBSA (change it if needed)"
-echo "echo -e "name 1 receptor\nname 13 ligand\n1 | 13\nq" | $gmx make_ndx -f em.tpr -o index.ndx"
-      echo -e "name 1 receptor\nname 13 ligand\n1 | 13\nq" | $gmx make_ndx -f em.tpr -o index.ndx
+echo "echo -e "name 1 receptor\nname 13 ligand\n1 | 13\nq" | $gmx make_ndx -f em_cg.tpr -o index.ndx"
+      echo -e "name 1 receptor\nname 13 ligand\n1 | 13\nq" | $gmx make_ndx -f em_cg.tpr -o index.ndx
 echo ""
-echo "$gmx_MMPBSA -O -i $native_dir/mmpbsa.in -cs em.tpr -ct em.trr -ci index.ndx -cg 1 13 -cp $native_dir/native_modelH.top -nogui -o ${input_pdb_basename}_emin_MMPBSA.dat"
-      $gmx_MMPBSA -O -i $native_dir/mmpbsa.in -cs em.tpr -ct em.trr -ci index.ndx -cg 1 13 -cp $native_dir/native_modelH.top -nogui -o ${input_pdb_basename}_emin_MMPBSA.dat
+echo "$gmx_MMPBSA -O -i $native_dir/mmpbsa.in -cs em_cg.tpr -ct em_cg.trr -ci index.ndx -cg 1 13 -cp $native_dir/native_modelH.top -nogui -o ${input_pdb_basename}_emin_MMPBSA.dat -eo ${input_pdb_basename}_emin_MMPBSA.csv"
+      $gmx_MMPBSA -O -i $native_dir/mmpbsa.in -cs em_cg.tpr -ct em_cg.trr -ci index.ndx -cg 1 13 -cp $native_dir/native_modelH.top -nogui -o ${input_pdb_basename}_emin_MMPBSA.dat -eo ${input_pdb_basename}_emin_MMPBSA.csv
 echo ""
 echo "cat ${input_pdb_basename}_emin_MMPBSA.dat"
       cat ${input_pdb_basename}_emin_MMPBSA.dat

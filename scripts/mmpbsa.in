@@ -7,7 +7,8 @@ Sample input file for GB calculation
 sys_name="Prot-Lig-ST",
 startframe=1,
 endframe=10,
+PBRadii=4,
 /
 &gb
-igb=5, saltcon=0.150,
+igb=8, saltcon=0.150,
 /

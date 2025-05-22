@@ -258,28 +258,6 @@ if [[ -f "$native_model_pdb" && -f "$native_ligand_pdb" && -f "$native_ligandH_p
    #        $python $scripts_dir/check_rmsd.py --ref $native_model_pdb "$af3_dir/[bs]*/aligned_ligandH_convert.pdb"
    #echo ""
 
-else # using the default AF3-predicted best pose
-
-    echo "# Alignment - Create the aligned the predicted model & ligand PDB structures"
-    native_model_pdb="$af3_dir/best_pose/model.pdb"
-    echo "# ✅ Using the AF3-predicted best pose as the reference model structure. Proceeding with ligand alignment..."
-    echo "   - $native_model_pdb"
-    echo "$ $python $scripts_dir/align_pdb.py "$af3_dir/[bs]*/model.pdb" --ref "$native_model_pdb""
-            $python $scripts_dir/align_pdb.py "$af3_dir/[bs]*/model.pdb" --ref "$native_model_pdb"
-    echo ""
-
-    echo "# Check their RMSD values: aligned_model.pdb"
-    echo "$ $python $scripts_dir/check_rmsd.py --ref $native_model_pdb "$af3_dir/[bs]*/aligned_model.pdb""
-            $python $scripts_dir/check_rmsd.py --ref $native_model_pdb "$af3_dir/[bs]*/aligned_model.pdb"
-    echo ""
-
-    echo "# Check their RMSD values: aligned_ligand.pdb"
-    echo "$ $python $scripts_dir/check_rmsd.py --ref $native_model_pdb "$af3_dir/[bs]*/aligned_ligand.pdb""
-            $python $scripts_dir/check_rmsd.py --ref $native_model_pdb "$af3_dir/[bs]*/aligned_ligand.pdb"
-    echo ""
-
-    # add hydrogens
-
 fi
 
 echo "# Remove the temporary files"

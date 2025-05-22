@@ -8,9 +8,9 @@ def build_residue_renumbering_map(pdb_lines):
     index = 0
     for line in pdb_lines:
         if line.startswith(("ATOM", "HETATM")):
-            res_name = line[17:20]
-            chain_id = line[21]
-            res_seq = line[22:26]
+            res_name = line[17:20].strip()
+            chain_id = line[21].strip()
+            res_seq = line[22:26].strip()
             key = (res_name, chain_id, res_seq)
             if key not in seen:
                 seen[key] = index
@@ -20,10 +20,10 @@ def build_residue_renumbering_map(pdb_lines):
 
 def extract_atom_key_from_line(line, res_map):
     """Generate an atom matching key using relative residue index."""
-    atom_name = line[12:16]       # preserve spacing
-    res_name = line[17:20]
-    chain_id = line[21]
-    res_seq = line[22:26]
+    atom_name = line[12:16].strip()
+    res_name = line[17:20].strip()
+    chain_id = line[21].strip()
+    res_seq = line[22:26].strip()
     rel_res_index = res_map.get((res_name, chain_id, res_seq))
     if rel_res_index is None:
         raise ValueError(f"Residue not found in map: {(res_name, chain_id, res_seq)}")
@@ -39,14 +39,14 @@ def build_coord_line_map(pdb_lines, res_map):
     coord_map = {}
     for line in pdb_lines:
         key = extract_atom_key_from_line(line, res_map)
-        coord_string = line[30:54]  # preserve original spacing
+        coord_string = line[30:54]  # keep x, y, z, exactly
         if key in coord_map:
             raise ValueError(f"Duplicate atom key found: {key}")
         coord_map[key] = coord_string
     return coord_map
 
 def merge_coordinates(ref_pdb, pdb, output_file):
-    # Read and parse lines
+    """Merge coordinates based on atom name and residue mapping."""
     with open(ref_pdb) as f:
         ref_lines = f.readlines()
     with open(pdb) as f:
@@ -65,7 +65,7 @@ def merge_coordinates(ref_pdb, pdb, output_file):
         if line.startswith(('ATOM', 'HETATM')):
             key = extract_atom_key_from_line(line, ref_res_map)
             if key not in coord_map:
-                raise ValueError(f"❌ Atom not found in coordinate PDB: {key}")
+                raise ValueError(f"❌ Atom not found in coordinate target PDB: {key}")
             coord_str = coord_map[key]
             new_line = line[:30] + coord_str + line[54:]
             updated_lines.append(new_line)

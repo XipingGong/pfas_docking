@@ -29,7 +29,7 @@ START_TIME=$SECONDS
 # -----
 scripts_dir="/home/xg69107/program/pfas_docking/scripts"
 python="/home/xg69107/program/anaconda/anaconda3/bin/python"
-work_dir="/home/xg69107/program/pfas_docking/test/dock_dir/7AAI_8PF" # the current working directory
+work_dir=$(pwd) # the current working directory
 
 af3_json="$work_dir/af3.json" # we need an "af3.json" file in the working directory
 if [[ ! -f "$af3_json" ]]; then

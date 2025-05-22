@@ -1,90 +1,137 @@
 #!/usr/bin/env python3
-
-import argparse
-import re
+import glob
+import os
 import sys
-from collections import defaultdict
+import numpy as np
+import re
 
-def parse_blocks(input_file):
-    blocks = defaultdict(list)
-    current_block = None
-    has_processing = False
+# Check usage
+if len(sys.argv) != 2:
+    print("Usage: python tmp.py \"[pattern]\"")
+    sys.exit(1)
 
-    with open(input_file, 'r') as f:
-        for line in f:
-            if "Processing" in line:
-                has_processing = True
-                match = re.search(r'Processing (\S+)', line)
-                if match:
-                    current_block = match.group(1)
-            if current_block:
-                blocks[current_block].append(line.strip())
+pattern = sys.argv[1]
+pdb_files = glob.glob(pattern)
+if not pdb_files:
+    print(f"No files found matching pattern: {pattern}")
+    sys.exit(1)
 
-    # If no 'Processing' found, treat the whole file as one block
-    if not has_processing:
-        blocks["SingleExample"] = []
-        with open(input_file, 'r') as f:
-            for line in f:
-                blocks["SingleExample"].append(line.strip())
+# Define keywords (label, suffix, keyword in file)
+terms = [
+    # RMSD terms
+    ("Protein_Backbone_RMSD_(Direct)", "_RMSD.dat", "Protein Backbone RMSD (Direct)"),
+    ("Protein_Backbone_RMSD_(MDTraj)", "_RMSD.dat", "Protein Backbone RMSD (MDTraj)"),
+    ("ΔLigand_RMSD_(Direct)", "_RMSD.dat", "Ligand RMSD (Direct)"),
+    ("ΔLigand_RMSD_(MDTraj)", "_RMSD.dat", "Ligand RMSD (MDTraj)"),
+    ("Protein_Backbone_Pocket_RMSD_(Direct)", "_RMSD.dat", "Protein Backbone Pocket RMSD (Direct)"),
+    ("Protein_Backbone_Pocket_RMSD_(MDTraj)", "_RMSD.dat", "Protein Backbone Pocket RMSD (MDTraj)"),
 
-    return blocks
+    # NATRMSD terms
+    ("Native_Protein_Backbone_RMSD_(Direct)", "_NATRMSD.dat", "Protein Backbone RMSD (Direct)"),
+    ("Native_Protein_Backbone_RMSD_(MDTraj)", "_NATRMSD.dat", "Protein Backbone RMSD (MDTraj)"),
+    ("Native_ΔLigand_RMSD_(Direct)", "_NATRMSD.dat", "Ligand RMSD (Direct)"),
+    ("Native_ΔLigand_RMSD_(MDTraj)", "_NATRMSD.dat", "Ligand RMSD (MDTraj)"),
+    ("Native_Protein_Backbone_Pocket_RMSD_(Direct)", "_NATRMSD.dat", "Protein Backbone Pocket RMSD (Direct)"),
+    ("Native_Protein_Backbone_Pocket_RMSD_(MDTraj)", "_NATRMSD.dat", "Protein Backbone Pocket RMSD (MDTraj)"),
 
-def process_block(block_lines):
-    top1rmsd_data = {}
-    mmpbsa_data = {}
-    rmsd_data = {}
+    # Energy terms
+    ("ΔVDWAALS",   "_MMPBSA.dat", "ΔVDWAALS"),
+    ("ΔEEL",       "_MMPBSA.dat", "ΔEEL"),
+    ("ΔEGB",       "_MMPBSA.dat", "ΔEGB"),
+    ("ΔESURF",     "_MMPBSA.dat", "ΔESURF"),
+    ("ΔGGAS",      "_MMPBSA.dat", "ΔGGAS"),
+    ("ΔGSOLV",     "_MMPBSA.dat", "ΔGSOLV"),
+    ("ΔTOTAL",     "_MMPBSA.dat", "ΔTOTAL"),
+    ("MMPBSA_Sum", "_MMPBSA.dat", "MMPBSA_Sum"),
 
-    for line in block_lines:
-        if re.search(r'_MMPBSA\.dat:ΔTOTAL', line):
-            file = line.split(':')[0]
-            energy = float(line.split(':')[1].split()[1])
-            mmpbsa_data[file] = energy
+]
 
-        elif re.search(r'_Top1RMSD\.dat:.*Ligand RMSD \(Direct\)', line):
-            file = line.split(':')[0]
-            rmsd = float(re.search(r'\[([0-9\.]*)\]', line).group(1))
-            top1rmsd_data[file] = rmsd
+# Add calculated headers
+header = ["pdb_file"] + [label for label, _, _ in terms if label != "ΔTOTAL"] + ["ΔTOT_VDW", "ΔTOT_ELE", "ΔTOTAL", "ST_Flag"]
 
-        elif re.search(r'_RMSD\.dat:.*Ligand RMSD \(Direct\)', line):
-            file = line.split(':')[0]
-            rmsd = float(re.search(r'\[([0-9\.]*)\]', line).group(1))
-            rmsd_data[file] = rmsd
+# Print table
+print("#" + " ".join(header))
 
-    return top1rmsd_data, mmpbsa_data, rmsd_data
+# Parse files
+for pdb_file in sorted(pdb_files):
+    file_prefix = os.path.splitext(pdb_file)[0]
+    row = [file_prefix+'.pdb']
+    values = {}
 
-def analyze_block(name, top1rmsd_data, mmpbsa_data, rmsd_data):
-    qualified_files = [f for f, rmsd in top1rmsd_data.items() if rmsd < 0.2]
+    for label, suffix, keyword in terms:
+        target_file = file_prefix + suffix
+        value = "NA"
+        if os.path.isfile(target_file):
+            with open(target_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    if keyword in line:
+                        try:
+                            if "RMSD" in keyword:
+                                match = re.search(r'Min\s*=\s*([\d\.Ee+-]+)', line)
+                                if match:
+                                    value = match.group(1)
+                            else:
+                                parts = line.split()
+                               #print(f"debug: {line}")
+                                for i, part in enumerate(parts):
+                                    if part in keyword and i + 1 <= len(parts):
+                                        value = parts[i + 1]
+                                        break
+                        except:
+                            value = "NA"
+                        break
+        values[label] = value
 
-    if not qualified_files:
-        print(f"❌ {name}: No pose with Top1RMSD < 0.2 nm.\n")
-        return
+    # Add all values except ΔTOTAL
+    for label, _, _ in terms:
+        if label != "ΔTOTAL":
+            row.append(values.get(label, "NA"))
 
-    best_file = min(qualified_files, key=lambda f: mmpbsa_data.get(f.replace('_Top1RMSD', '_MMPBSA'), float('inf')))
+    # ΔTOT_VDW = ΔVDWAALS + ΔESURF
+    try:
+        tot_vdw = float(values["ΔVDWAALS"]) + float(values["ΔESURF"])
+        row.append(f"{tot_vdw:.2f}")
+    except:
+        row.append("NA")
 
-    mmpbsa_file = best_file.replace('_Top1RMSD', '_MMPBSA')
-    rmsd_file = best_file.replace('_Top1RMSD', '_RMSD')
+    # ΔTOT_ELE = ΔEEL + ΔEGB
+    try:
+        tot_ele = float(values["ΔEEL"]) + float(values["ΔEGB"])
+        row.append(f"{tot_ele:.2f}")
+    except:
+        row.append("NA")
 
-    mmpbsa_value = mmpbsa_data.get(mmpbsa_file, None)
-    top1rmsd_value = top1rmsd_data.get(best_file, None)
-    rmsd_value = rmsd_data.get(rmsd_file, None)
+    # Add ΔTOTAL
+    row.append(values.get("ΔTOTAL", "NA"))
 
-    print(f"✅ Best pose (AF3-Vina-MMPBSA) - {best_file[:-13]}.pdb ; MMPBSA ΔTOTAL: {mmpbsa_value:.2f} kcal/mol; Top1RMSD: {top1rmsd_value:.3f} nm ; RMSD: {rmsd_value:.3f} nm\n")
+    # Compute ST_Flag
+    cutoff = 0.2
+    ligand_rmsd = values.get("ΔLigand_RMSD_(MDTraj)", "NA")
+    backbone_rmsd = values.get("Protein_Backbone_RMSD_(MDTraj)", "NA")
 
-def main():
-    parser = argparse.ArgumentParser(description="Analyze docking results per molecule: find best pose with Top1RMSD < 0.2 nm and minimum ΔTOTAL energy.")
-    parser.add_argument("input_file", help="Input log file containing one or multiple Processing blocks")
-    args = parser.parse_args()
+    try:
+        ligand_rmsd_val = float(ligand_rmsd)
+    except:
+        ligand_rmsd_val = None
 
-    blocks = parse_blocks(args.input_file)
+    try:
+        backbone_rmsd_val = float(backbone_rmsd)
+    except:
+        backbone_rmsd_val = None
 
-    if not blocks:
-        print("❌ No valid data found in the input file.")
-        sys.exit(1)
+    if ligand_rmsd_val is not None and backbone_rmsd_val is not None:
+        if ligand_rmsd_val < cutoff and backbone_rmsd_val < cutoff:
+            flag = "Good"
+        elif ligand_rmsd_val < cutoff and backbone_rmsd_val >= cutoff:
+            flag = "Bad_ProteinBackbone"
+        elif ligand_rmsd_val >= cutoff and backbone_rmsd_val < cutoff:
+            flag = "Bad_Ligand"
+        else:
+            flag = "Bad_ProteinBackbone_Ligand"
+    else:
+        flag = "NA"
 
-    for name, lines in blocks.items():
-        top1rmsd_data, mmpbsa_data, rmsd_data = process_block(lines)
-        analyze_block(name, top1rmsd_data, mmpbsa_data, rmsd_data)
+    row.append(flag)
 
-if __name__ == "__main__":
-    main()
+    print(" ".join(row))
 

@@ -1,13 +1,50 @@
 #!/bin/bash
 
-
 START_TIME=$SECONDS
+
 python="/home/xg69107/program/anaconda/anaconda3/bin/python"
-scripts_dir='/home/xg69107/program/pfas_docking/scripts' # need to change 
+scripts_dir="/home/xg69107/program/pfas_docking/scripts"
+
+show_help() {
+    echo "Usage: bash run_all_mmpbsa.sh \"[pattern]\""
+    echo ""
+    echo "This script runs MMPBSA analysis on a set of PDB files that match the given glob pattern."
+    echo ""
+    echo "Arguments:"
+    echo "  [pattern]         A glob pattern for input PDB files (in quotes)."
+    echo "                    Example: \"vina/vina_model_*_convert.pdb\""
+    echo ""
+    echo "Options:"
+    echo "  -h, --help        Show this help message and exit."
+    echo ""
+    echo "Output:"
+    echo "  Processed files will be saved under the ./mmpbsa directory."
+    echo ""
+    exit 0
+}
+
+# Check for help
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    show_help
+fi
+
+# Check usage
+if [ "$#" -ne 1 ]; then
+    echo "❌ Error: Please provide exactly one glob pattern as argument."
+    echo "Use --help for more information."
+    exit 1
+fi
+
+input_pattern="$1"
+pdb_files=( $input_pattern )  # Expand the pattern into an array
+
+if [ ${#pdb_files[@]} -eq 0 ]; then
+    echo "❌ No files found matching pattern: $input_pattern"
+    exit 1
+fi
 
 mkdir -p mmpbsa
 
-# Function to process each model
 process_model() {
     local pdb_file="$1"
     local base_name="${pdb_file%.pdb}"
@@ -15,55 +52,33 @@ process_model() {
 
     echo ">> Processing: $pdb_file"
 
-    # Step 1: Generate H-added input pdb file
-    bash $scripts_dir/get_ref_for_af3vinammpbsa.sh \
+    bash "$scripts_dir/get_ref_for_af3vinammpbsa.sh" \
         --input_pdb "$work_pdb" \
         --work_dir mmpbsa \
         --native_dir native
 
-    # Step 2: Run MMPBSA
-    bash $scripts_dir/mmpbsa.sh \
+    bash "$scripts_dir/mmpbsa.sh" \
         --input_pdb "mmpbsa/${base_name}H.pdb" \
         --work_dir mmpbsa \
         --native_dir native
 
-    # Step 3: Check RMSD values
-    if [[ $base_name == af3* ]]; then
-        ref_file="mmpbsa/af3-best_pose-aligned_model_convertH_emin.pdb"
-    elif [[ $base_name == vina* ]]; then
-        ref_file="mmpbsa/vina-vina_model_1_convertH_emin.pdb"
-    elif [[ $base_name == nat* ]]; then
-        ref_file="native/native_modelH.pdb"
-    else
-        echo "⚠️ Warning: Unknown prefix for $base_name — skipping RMSD"
-        return
-    fi
-    $python $scripts_dir/check_rmsd.py \
-        --ref "$ref_file" \
-        "mmpbsa/${base_name}H_emin.pdb" \
-        > "mmpbsa/${base_name}H_emin_Top1RMSD.dat"
-
-    # Step 4: Output MMPBSA & RMSD result
-    echo "📄 Results for $base_name:"
-    cat "mmpbsa/${base_name}H_emin_MMPBSA.dat"
-    cat "mmpbsa/${base_name}H_emin_Top1RMSD.dat"
     echo "✅ Done: $pdb_file"
-    echo "--------------------------------------------"
 }
 
-echo "🚀 Starting AF3 and Vina models..."
-for pdb_file in {native/native_model.pdb,af3/*/aligned_model_convert.pdb,vina/vina_model_*_convert.pdb}; do
-    if [[ -f "$pdb_file" ]]; then
-        full_path=$(realpath "$pdb_file")
-        safe_name=$(echo "$pdb_file" | sed 's|/|-|g')
+echo "🚀 Starting MMPBSA for files matching: $input_pattern"
 
+for pdb_path in "${pdb_files[@]}"; do
+    if [[ -f "$pdb_path" ]]; then
+        full_path=$(realpath "$pdb_path")
+        safe_name=$(echo "$pdb_path" | sed 's|/|-|g')
         cp "$full_path" "mmpbsa/$safe_name"
         process_model "$safe_name"
-
+    else
+        echo "⚠️ Skipping (not a file): $pdb_path"
     fi
 done
 
 END_TIME=$SECONDS
 ELAPSED_TIME=$((END_TIME - START_TIME))
-echo "$(date '+%Y-%m-%d %H:%M:%S') Time taken for run_all_mmpbsa.sh script: $ELAPSED_TIME seconds"
+echo "$(date '+%Y-%m-%d %H:%M:%S') ⏱️ Total time: $ELAPSED_TIME seconds"
 

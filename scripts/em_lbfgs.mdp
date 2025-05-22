@@ -1,0 +1,32 @@
+define = -DPOSRES
+
+; Energy minimization input file
+;integrator      = steep        ; Algorithm
+;emtol           = 10.0       ; Convergence tolerance
+;emstep          = 0.01         ; Step size
+;nsteps          = 50000        ; Max steps
+
+;integrator = cg       ; or l-bfgs
+;emtol      = 10.0    ; lower tolerance for better convergence
+;nsteps     = 50000    ; or more, to allow enough steps
+
+integrator = l-bfgs
+emtol      = 10.0    ; lower tolerance for better convergence
+nsteps     = 50000    ; or more, to allow enough steps
+
+
+
+
+; Neighborsearching
+nstlist         = 1           ; Updated based on Verlet recommendation
+cutoff-scheme   = Verlet
+ns_type         = grid         ; grid is preferred for performance
+
+; Electrostatics
+coulombtype     = Cut-off
+rcoulomb        = 2.4
+rvdw            = 2.4
+
+; Periodic boundary conditions
+pbc             = xyz
+

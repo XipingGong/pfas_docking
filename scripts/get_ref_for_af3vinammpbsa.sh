@@ -33,7 +33,7 @@ print_help() {
     echo "Optional arguments:"
     echo "  --work_dir      Working directory (default: current directory)"
     echo "  --native_dir    Directory to save the reference structures (default: work_dir)"
-    echo "                  Note: if the native_dir exists, then it will add hydrogens and a new input_pdbH.pdb will be created"
+    echo "                  Note: if the native_dir has the native structures, then it will add hydrogens and a new input_pdbH.pdb will be created"
     echo "  -h, --help      Show this help message and exit"
     echo ""
     exit 0
@@ -157,8 +157,8 @@ if [ "$has_native_dir" == "true" ]; then
           $python $scripts_dir/merge_2pdbs.py x_protH.pdb x_ligH.pdb -o x_modelH.pdb
     echo ""
 
-    echo "$gmx editconf -f x_modelH.pdb -o ${input_pdb_basename}H.pdb -bt cubic -d 2.0 -noc"
-          $gmx editconf -f x_modelH.pdb -o ${input_pdb_basename}H.pdb -bt cubic -d 2.0 -noc
+    echo "$gmx editconf -f x_modelH.pdb -o ${input_pdb_basename}H.pdb -bt cubic -d 5.0 -noc"
+          $gmx editconf -f x_modelH.pdb -o ${input_pdb_basename}H.pdb -bt cubic -d 5.0 -noc
     echo ""
 
 fi
@@ -168,6 +168,15 @@ if [ "$has_native_dir" == "false" ]; then
     echo "# Case 2: Creating the native reference structures"
     echo "cp $input_pdb native_model.pdb"
           cp $input_pdb native_model.pdb
+    echo ""
+
+    # Copy the additional required input files
+    echo "# Copy the additional required mdp input files"
+    echo "cp $scripts_dir/em_*.mdp $work_dir/"
+          cp $scripts_dir/em_*.mdp $work_dir/
+    echo ""
+    echo "cp $scripts_dir/mmpbsa.in $work_dir/mmpbsa.in"
+          cp $scripts_dir/mmpbsa.in $work_dir/mmpbsa.in
     echo ""
 
     # Extract the protein and ligand
@@ -180,16 +189,66 @@ if [ "$has_native_dir" == "false" ]; then
 
     # Add hydrogen atoms and save the native protein and ligand structures as a reference
     # - Native Protein
-    echo "$ $gmx pdb2gmx -f native_protein.pdb -o x_native_proteinH.pdb -p native_proteinH.top -ff $protein_ff -water tip3p"
-            $gmx pdb2gmx -f native_protein.pdb -o x_native_proteinH.pdb -p native_proteinH.top -ff $protein_ff -water tip3p
+    echo "$ $gmx pdb2gmx -f native_protein.pdb -o native_proteinH_ori.pdb -p native_proteinH.top -ff $protein_ff -water tip3p"
+            $gmx pdb2gmx -f native_protein.pdb -o native_proteinH_ori.pdb -p native_proteinH.top -ff $protein_ff -water tip3p
     echo ""
-    echo "$ $gmx editconf -f x_native_proteinH.pdb -o native_proteinH.pdb"
-            $gmx editconf -f x_native_proteinH.pdb -o native_proteinH.pdb
+
+    echo "$ echo 1 | $gmx genrestr -f native_proteinH_ori.pdb -o posre.itp -fc 10000 10000 10000"
+            echo 1 | $gmx genrestr -f native_proteinH_ori.pdb -o posre.itp -fc 10000 10000 10000
     echo ""
+
+    echo "$gmx editconf -f native_proteinH_ori.pdb -o x_native_proteinH.pdb -bt cubic -d 5.0"
+          $gmx editconf -f native_proteinH_ori.pdb -o x_native_proteinH.pdb -bt cubic -d 5.0
+    echo ""
+
+    # steep-optimization
+    echo "$gmx grompp -f em_steep_free.mdp -c x_native_proteinH.pdb -r x_native_proteinH.pdb -p native_proteinH.top -o em_steep_free.tpr -maxwarn 1"
+          $gmx grompp -f em_steep_free.mdp -c x_native_proteinH.pdb -r x_native_proteinH.pdb -p native_proteinH.top -o em_steep_free.tpr -maxwarn 1
+    echo ""
+
+    echo "$gmx mdrun -v -deffnm em_steep_free"
+          $gmx mdrun -v -deffnm em_steep_free
+    echo ""
+
+    # cg-optimization
+    echo "$gmx grompp -f em_cg_free.mdp -c em_steep_free.gro -r x_native_proteinH.pdb -p native_proteinH.top -o em_cg_free.tpr -maxwarn 1"
+          $gmx grompp -f em_cg_free.mdp -c em_steep_free.gro -r x_native_proteinH.pdb -p native_proteinH.top -o em_cg_free.tpr -maxwarn 1
+    echo ""
+
+    echo "$gmx mdrun -v -deffnm em_cg_free"
+          $gmx mdrun -v -deffnm em_cg_free
+    echo ""
+
+    # lbfgs-optimization
+    echo "$gmx grompp -f em_lbfgs_free.mdp -c em_cg_free.gro -r x_native_proteinH.pdb -p native_proteinH.top -o em_lbfgs_free.tpr -maxwarn 1"
+          $gmx grompp -f em_lbfgs_free.mdp -c em_cg_free.gro -r x_native_proteinH.pdb -p native_proteinH.top -o em_lbfgs_free.tpr -maxwarn 1
+    echo ""
+
+    echo "$gmx mdrun -v -deffnm em_lbfgs_free"
+          $gmx mdrun -v -deffnm em_lbfgs_free
+    echo ""
+
+
+    echo "echo -e "0\n0" | $gmx trjconv -f em_lbfgs_free.gro -s em_lbfgs_free.tpr -o em_lbfgs_free_mol.pdb -pbc mol -center -ur compact -dump 0"
+          echo -e "0\n0" | $gmx trjconv -f em_lbfgs_free.gro -s em_lbfgs_free.tpr -o em_lbfgs_free_mol.pdb -pbc mol -center -ur compact -dump 0
+    echo ""
+
+    # alignment
+    echo "$ $python $scripts_dir/align_pdb.py em_lbfgs_free_mol.pdb --ref native_proteinH_ori.pdb --output x_native_proteinH.pdb"
+            $python $scripts_dir/align_pdb.py em_lbfgs_free_mol.pdb --ref native_proteinH_ori.pdb --output x_native_proteinH.pdb
+    echo ""
+
+    echo "$python $scripts_dir/update_pdb_coord.py x_native_proteinH.pdb --ref native_proteinH_ori.pdb -o native_proteinH_emin.pdb"
+          $python $scripts_dir/update_pdb_coord.py x_native_proteinH.pdb --ref native_proteinH_ori.pdb -o native_proteinH_emin.pdb
+    echo ""
+
+    echo "cp native_proteinH_emin.pdb native_proteinH.pdb"
+          cp native_proteinH_emin.pdb native_proteinH.pdb
+    echo ""
+
     echo "$ $obabel -ipdb native_proteinH.pdb -omol2 -O native_proteinH.mol2"
             $obabel -ipdb native_proteinH.pdb -omol2 -O native_proteinH.mol2
     echo ""
-
 
     # - Native Ligand
     echo "$ $obabel native_ligand.pdb -O x_native_ligandH.pdb -p 7.4"
@@ -224,20 +283,11 @@ if [ "$has_native_dir" == "false" ]; then
     echo "$ $python $scripts_dir/merge_2pdbs.py native_proteinH.pdb native_ligandH.pdb -o x_native_modelH.pdb"
             $python $scripts_dir/merge_2pdbs.py native_proteinH.pdb native_ligandH.pdb -o x_native_modelH.pdb
     echo ""
-    echo "$ $gmx editconf -f x_native_modelH.pdb -o native_modelH.pdb -bt cubic -d 2.0 -noc"
-            $gmx editconf -f x_native_modelH.pdb -o native_modelH.pdb -bt cubic -d 2.0 -noc
+    echo "$ $gmx editconf -f x_native_modelH.pdb -o native_modelH.pdb -bt cubic -d 5.0 -noc"
+            $gmx editconf -f x_native_modelH.pdb -o native_modelH.pdb -bt cubic -d 5.0 -noc
     echo ""
     echo "$ $python $scripts_dir/merge_2tops.py native_proteinH.top ligandH_GMX.top > native_modelH.top"
             $python $scripts_dir/merge_2tops.py native_proteinH.top ligandH_GMX.top > native_modelH.top
-    echo ""
-
-    # Copy the additional required input files
-    echo "# Copy the additional required input files"
-    echo "cp $scripts_dir/em.mdp $work_dir/em.mdp"
-          cp $scripts_dir/em.mdp $work_dir/em.mdp
-    echo ""
-    echo "cp $scripts_dir/mmpbsa.in $work_dir/mmpbsa.in"
-          cp $scripts_dir/mmpbsa.in $work_dir/mmpbsa.in
     echo ""
 
 fi
